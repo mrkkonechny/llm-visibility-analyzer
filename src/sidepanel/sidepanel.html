@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM Visibility Analyzer</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="header">
+      <h1>LLM Visibility Analyzer</h1>
+      <div class="page-info" id="pageInfo">
+        <span class="page-domain" id="pageDomain">-</span>
+      </div>
+    </header>
+
+    <!-- Context Selector (shown before analysis) -->
+    <section id="contextSelector" class="context-selector">
+      <h2>Select Consumer Context</h2>
+      <p class="context-description">How would a consumer typically approach this product?</p>
+      <div class="context-options">
+        <button class="context-btn" data-context="want">
+          <span class="context-icon">💝</span>
+          <strong>Want</strong>
+          <span class="context-hint">Emotional, lifestyle-driven</span>
+        </button>
+        <button class="context-btn" data-context="need">
+          <span class="context-icon">🔧</span>
+          <strong>Need</strong>
+          <span class="context-hint">Functional, spec-driven</span>
+        </button>
+        <button class="context-btn" data-context="hybrid">
+          <span class="context-icon">⚖️</span>
+          <strong>Hybrid</strong>
+          <span class="context-hint">Balanced consideration</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Loading State -->
+    <section id="loadingState" class="loading hidden">
+      <div class="spinner"></div>
+      <p>Analyzing page...</p>
+      <p class="loading-hint">Extracting structured data, meta tags, and content...</p>
+    </section>
+
+    <!-- Results -->
+    <section id="results" class="results hidden">
+      <!-- Overall Score -->
+      <div class="score-card">
+        <div class="grade-container">
+          <div class="grade" id="gradeDisplay">-</div>
+        </div>
+        <div class="score-details">
+          <div class="score-value"><span id="scoreValue">0</span><span class="score-max">/100</span></div>
+          <div class="context-label" id="contextLabel">-</div>
+          <div class="grade-description" id="gradeDescription">-</div>
+        </div>
+      </div>
+
+      <!-- Category Breakdown -->
+      <div class="section-header">
+        <h3>Category Scores</h3>
+      </div>
+      <div class="categories" id="categoryList">
+        <!-- Dynamically populated -->
+      </div>
+
+      <!-- Recommendations -->
+      <div class="section-header">
+        <h3>Recommendations</h3>
+        <span class="rec-count" id="recCount">0</span>
+      </div>
+      <div class="recommendations" id="recommendationList">
+        <!-- Dynamically populated -->
+      </div>
+
+      <!-- Actions -->
+      <div class="actions">
+        <button id="reanalyzeBtn" class="btn btn-secondary">
+          Re-analyze with Different Context
+        </button>
+      </div>
+    </section>
+
+    <!-- Error State -->
+    <section id="errorState" class="error-state hidden">
+      <div class="error-icon">⚠️</div>
+      <h3>Analysis Error</h3>
+      <p id="errorMessage">Unable to analyze this page.</p>
+      <button id="retryBtn" class="btn btn-primary">Try Again</button>
+    </section>
+
+    <!-- History View -->
+    <section id="historySection" class="history-section hidden">
+      <div class="section-header">
+        <h3>Recent Analyses</h3>
+        <button id="clearHistoryBtn" class="btn-icon" title="Clear History">🗑️</button>
+      </div>
+      <div id="historyList" class="history-list">
+        <!-- Dynamically populated -->
+      </div>
+      <div id="emptyHistory" class="empty-state hidden">
+        <p>No analyses yet. Click the extension icon on a product page to get started.</p>
+      </div>
+    </section>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-tab="results">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">Results</span>
+      </button>
+      <button class="nav-btn" data-tab="history">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">History</span>
+      </button>
+    </nav>
+  </div>
+
+  <script src="sidepanel.js" type="module"></script>
+</body>
+</html>
