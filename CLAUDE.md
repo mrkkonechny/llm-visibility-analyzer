@@ -251,13 +251,27 @@ Factors in the side panel have expandable recommendation tips:
 ## Common Tasks
 
 ### Adding a New Factor
-1. Add extraction logic:
-   - For structured data schemas: edit `src/content/content-script.js` (both `categorizeSchemas()` for JSON-LD and `categorizeMicrodataSchemas()` for microdata)
-   - For other factors: edit appropriate `src/content/extractors/*.js`
+1. Add extraction logic in `src/content/content-script.js`:
+   - For structured data: edit `categorizeSchemas()` (JSON-LD) and `categorizeMicrodataSchemas()` (microdata)
+   - For content quality: edit relevant `extract*()` functions
+   - For AI discoverability: edit `extractAIDiscoverabilitySignals()` or add service worker handlers
 2. Add factor weight in `src/scoring/weights.js` → `FACTOR_WEIGHTS`
-3. If context-sensitive, add multipliers in `CONTEXT_MULTIPLIERS`
-4. Add recommendation rule in `src/recommendations/recommendation-rules.js`
-5. Add factor-to-recommendation mapping in `src/scoring/weights.js` → `FACTOR_RECOMMENDATIONS`
+3. Add scoring logic in `src/scoring/scoring-engine.js` → appropriate `score*()` method
+4. If context-sensitive, add multipliers in `CONTEXT_MULTIPLIERS`
+5. Add recommendation rule in `src/recommendations/recommendation-rules.js`
+6. Add factor-to-recommendation mapping in `src/scoring/weights.js` → `FACTOR_RECOMMENDATIONS`
+
+### Adding a New Category
+1. Add category description in `src/scoring/weights.js` → `CATEGORY_DESCRIPTIONS`
+2. Add category weight in `CATEGORY_WEIGHTS` (must sum to 1.0 - rebalance existing)
+3. Add factor weights in `FACTOR_WEIGHTS.newCategory`
+4. Add `scoreNewCategory()` method in `src/scoring/scoring-engine.js`
+5. Update `calculateScore()` to include new category in `categoryScores` and weighted total
+6. Add extraction function in `src/content/content-script.js` and include in `performFullExtraction()`
+7. Add category to `categoryOrder` array in `src/sidepanel/sidepanel.js` → `renderCategories()`
+8. Add recommendation templates in `src/recommendations/recommendation-rules.js`
+9. Add factor-to-recommendation mappings in `FACTOR_RECOMMENDATIONS`
+10. Update this documentation file
 
 ### Modifying Scoring Weights
 Edit `src/scoring/weights.js`:
