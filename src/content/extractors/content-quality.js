@@ -66,7 +66,27 @@ function analyzeDescription(content) {
     '#description',
     '[data-component="description"]',
     '.product-info__description',
-    '.pdp-description'
+    '.pdp-description',
+    // Shopify selectors
+    '.product-single__description',
+    '.product__description',
+    '.rte',
+    '.rte-formatter',
+    // Additional Shopify theme patterns
+    '.product__info-description',
+    '.product-single__content',
+    '.product__content',
+    '[data-product-description]',
+    '#tab-description',
+    '.tab-content[data-tab="description"]',
+    '.product-details__description',
+    '.accordion__content',
+    '.collapsible-content',
+    // Attribute-based fallbacks
+    '[class*="product-description"]',
+    '[class*="product_description"]',
+    '[id*="product-description"]',
+    '[id*="ProductDescription"]'
   ];
 
   let descriptionElement = null;

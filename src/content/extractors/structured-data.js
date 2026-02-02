@@ -546,5 +546,30 @@ function categorizeMicrodataSchemas(microdataItems, schemas) {
         raw: item
       };
     }
+
+    if (type === 'breadcrumblist' && !schemas.breadcrumb) {
+      schemas.breadcrumb = extractBreadcrumbFromMicrodata(item);
+    }
   });
+}
+
+/**
+ * Extract breadcrumb data from microdata format
+ * @param {Object} item - Microdata item with BreadcrumbList type
+ * @returns {Object} Breadcrumb schema properties
+ */
+function extractBreadcrumbFromMicrodata(item) {
+  const listElements = item.properties.itemListElement || [];
+  const elements = Array.isArray(listElements) ? listElements : [listElements];
+
+  return {
+    itemCount: elements.length,
+    items: elements.map(el => ({
+      position: el.properties?.position || null,
+      name: el.properties?.name || null,
+      url: el.properties?.item || null
+    })),
+    source: 'microdata',
+    raw: item
+  };
 }

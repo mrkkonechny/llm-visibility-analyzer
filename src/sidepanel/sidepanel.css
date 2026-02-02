@@ -369,6 +369,58 @@ body {
   margin-left: var(--space-xs);
 }
 
+/* Factor with recommendation */
+.factor.has-recommendation {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.factor-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.factor-expand-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  padding: 0 var(--space-xs) 0 0;
+  transition: color 0.2s;
+}
+
+.factor-expand-btn:hover {
+  color: var(--text-secondary);
+}
+
+.factor-recommendation {
+  margin-top: var(--space-xs);
+  margin-left: 16px;
+  padding: var(--space-sm);
+  background: var(--bg-primary);
+  border-radius: 4px;
+  border-left: 2px solid var(--impact-medium);
+}
+
+.factor.fail .factor-recommendation {
+  border-left-color: var(--impact-high);
+}
+
+.factor-rec-text {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-xs) 0;
+}
+
+.factor-rec-impl {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  margin: 0;
+  font-style: italic;
+}
+
 /* Recommendations */
 .recommendations {
   display: flex;
