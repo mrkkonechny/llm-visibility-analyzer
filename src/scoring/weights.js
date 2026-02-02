@@ -4,6 +4,17 @@
  */
 
 /**
+ * Category descriptions for tooltips
+ */
+export const CATEGORY_DESCRIPTIONS = {
+  structuredData: 'JSON-LD and schema.org markup that helps AI understand product data',
+  protocolMeta: 'Open Graph, Twitter Cards, and meta tags for sharing and discovery',
+  contentQuality: 'Product descriptions, specifications, features, and FAQ content',
+  contentStructure: 'Semantic HTML, headings, accessibility, and image alt text',
+  authorityTrust: 'Reviews, ratings, brand clarity, and trust signals'
+};
+
+/**
  * Category weights (must sum to 1.0)
  */
 export const CATEGORY_WEIGHTS = {

@@ -5,7 +5,7 @@
 
 import { ScoringEngine } from '../scoring/scoring-engine.js';
 import { RecommendationEngine } from '../recommendations/recommendation-engine.js';
-import { getGradeDescription } from '../scoring/weights.js';
+import { getGradeDescription, CATEGORY_DESCRIPTIONS } from '../scoring/weights.js';
 import {
   saveAnalysis,
   getHistory,
@@ -232,7 +232,7 @@ class SidePanelApp {
 
       card.innerHTML = `
         <div class="category-header" data-expanded="false">
-          <span class="category-name">${data.categoryName}</span>
+          <span class="category-name" title="${CATEGORY_DESCRIPTIONS[key]}">${data.categoryName}</span>
           <span class="category-score ${scoreClass}">${Math.round(data.score)}</span>
           <span class="expand-icon">+</span>
         </div>
