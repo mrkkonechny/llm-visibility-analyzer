@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/claude-code) when working 
 
 ## Project Overview
 
-LLM Visibility Analyzer is a Chrome extension that analyzes eCommerce Product Detail Pages (PDPs) for their visibility and representation within Large Language Model chat interfaces. It scores pages across ~70 factors in 5 categories and provides actionable recommendations.
+pdpIQ (Product Description Page IQ) is a Chrome extension by **Tribbute** that analyzes eCommerce Product Detail Pages (PDPs) for AI citation readiness. It scores pages across ~70 factors in 5 categories and provides actionable recommendations.
 
 ## Tech Stack
 
@@ -17,14 +17,39 @@ LLM Visibility Analyzer is a Chrome extension that analyzes eCommerce Product De
 ## Project Structure
 
 ```
-src/
-├── background/         # Service worker for message routing and image verification
-├── content/            # Content script for page data extraction
-├── scoring/            # Scoring engine, weights, and grading utilities
-├── recommendations/    # Recommendation engine and rules
-├── sidepanel/          # UI (HTML, CSS, JS)
-├── storage/            # Local storage manager
-└── utils/              # Shared utilities
+pdpiq/
+├── manifest.json                 # Extension configuration
+├── icons/
+│   ├── icon16.png               # Toolbar icon
+│   ├── icon48.png               # Extensions page icon
+│   ├── icon128.png              # Chrome Web Store icon
+│   └── tribbute-logo.png        # Header branding
+├── src/
+│   ├── background/
+│   │   └── service-worker.js    # Message routing, image format verification
+│   ├── content/
+│   │   ├── content-script.js    # Main extraction orchestrator
+│   │   └── extractors/
+│   │       ├── index.js         # Extractor exports
+│   │       ├── structured-data.js   # JSON-LD, Microdata, RDFa
+│   │       ├── meta-tags.js         # OG, Twitter Cards, canonical
+│   │       ├── content-quality.js   # Description, specs, features
+│   │       ├── content-structure.js # Headings, semantic HTML
+│   │       └── trust-signals.js     # Reviews, ratings, certs
+│   ├── scoring/
+│   │   ├── scoring-engine.js    # Core scoring calculations
+│   │   ├── weights.js           # Category/factor/context weights
+│   │   └── grading.js           # Grade utilities (A-F)
+│   ├── recommendations/
+│   │   ├── recommendation-engine.js  # Prioritization logic
+│   │   └── recommendation-rules.js   # Issue-to-fix mappings
+│   ├── sidepanel/
+│   │   ├── sidepanel.html       # UI markup
+│   │   ├── sidepanel.css        # Styling
+│   │   └── sidepanel.js         # UI controller
+│   └── storage/
+│       └── storage-manager.js   # Analysis history persistence
+└── styles/                      # Additional stylesheets
 ```
 
 ## Development Workflow
@@ -40,18 +65,69 @@ src/
 - For content script changes, also refresh the target page
 - For service worker changes, click the "Update" button on the extension card
 
-## Architecture Notes
+### Debugging
+- Service worker: `chrome://extensions/` → "Inspect views: service worker"
+- Content script: DevTools on target page → Console
+- Side panel: Right-click side panel → Inspect
 
-- **Message passing**: Content script extracts page data, sends to service worker, which coordinates with side panel
-- **Scoring system**: Weighted categories (Structured Data 25%, Protocol/Meta 20%, Content Quality 25%, Content Structure 15%, Authority/Trust 15%)
-- **Context weighting**: Consumer context (Want/Need/Hybrid) applies multipliers to factor scores
-- **Critical issues**: Some factors (WebP og:image, robots noindex) have outsized impact on LLM visibility
+## Architecture
 
-## Key Files
+### Message Flow
+1. User clicks extension icon → opens side panel
+2. User selects context (Want/Need/Hybrid)
+3. Side panel sends `ANALYZE_PAGE` message to service worker
+4. Service worker injects/messages content script
+5. Content script runs extractors, returns raw data
+6. Service worker verifies image formats (HTTP HEAD requests)
+7. Side panel receives data, runs scoring engine
+8. Results displayed with recommendations
 
-- `manifest.json` - Extension configuration and permissions
-- `src/content/content-script.js` - Page data extraction logic
-- `src/scoring/scoring-engine.js` - Core scoring calculations
-- `src/scoring/weights.js` - Category and context weight definitions
-- `src/recommendations/recommendation-rules.js` - Improvement suggestions
-- `src/sidepanel/sidepanel.js` - UI controller
+### Scoring System
+
+**Category Weights** (total = 100%):
+- Structured Data: 25% (JSON-LD Product/Offer schemas critical)
+- Protocol & Meta: 20% (og:image format critical - WebP fails in LLM chats)
+- Content Quality: 25% (descriptions, specs, features, FAQ)
+- Content Structure: 15% (semantic HTML, headings, accessibility)
+- Authority & Trust: 15% (reviews, ratings, certifications)
+
+**Context Multipliers** adjust factor weights based on purchase type:
+- **Want** (emotional): boosts social proof, benefits, reviews; reduces specs
+- **Need** (functional): boosts specs, compatibility, certifications; reduces emotional content
+- **Hybrid**: neutral (1.0x all factors)
+
+### Critical Detection
+These issues have outsized impact and are flagged prominently:
+- `og:image` in WebP format (invisible in most LLM chat interfaces)
+- Missing Product schema (LLMs can't identify page as product)
+- `robots` meta with `noindex` (blocks LLM crawlers entirely)
+
+## Key Files Quick Reference
+
+| File | Purpose |
+|------|---------|
+| `manifest.json` | Extension permissions, content script config |
+| `src/content/content-script.js` | Orchestrates all data extraction |
+| `src/scoring/weights.js` | All scoring weights and multipliers |
+| `src/scoring/scoring-engine.js` | Score calculation logic |
+| `src/recommendations/recommendation-rules.js` | Fix suggestions per issue |
+| `src/sidepanel/sidepanel.js` | UI state management and rendering |
+
+## Common Tasks
+
+### Adding a New Factor
+1. Add extraction logic in appropriate `src/content/extractors/*.js`
+2. Add factor weight in `src/scoring/weights.js` → `FACTOR_WEIGHTS`
+3. If context-sensitive, add multipliers in `CONTEXT_MULTIPLIERS`
+4. Add recommendation rule in `src/recommendations/recommendation-rules.js`
+
+### Modifying Scoring Weights
+Edit `src/scoring/weights.js`:
+- `CATEGORY_WEIGHTS` - must sum to 1.0
+- `FACTOR_WEIGHTS` - relative weights within each category
+- `CONTEXT_MULTIPLIERS` - per-context adjustments
+
+### Updating UI
+- Markup: `src/sidepanel/sidepanel.html`
+- Styles: `src/sidepanel/sidepanel.css`
+- Logic: `src/sidepanel/sidepanel.js`

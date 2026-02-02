@@ -243,4 +243,4 @@ async function detectFormatFromMagicBytes(url) {
 }
 
 // Log when service worker starts
-console.log('LLM Visibility Analyzer service worker started');
+console.log('pdpIQ service worker started');

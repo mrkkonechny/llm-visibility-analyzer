@@ -29,7 +29,7 @@ function performFullExtraction() {
       }
     };
   } catch (error) {
-    console.error('LLM Visibility Analyzer: Extraction error', error);
+    console.error('pdpIQ: Extraction error', error);
     return {
       error: error.message,
       pageInfo: {
@@ -43,7 +43,7 @@ function performFullExtraction() {
 // Listen for extraction requests from service worker
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'EXTRACT_DATA') {
-    console.log('LLM Visibility Analyzer: Starting extraction');
+    console.log('pdpIQ: Starting extraction');
     const startTime = performance.now();
 
     const extractedData = performFullExtraction();
@@ -51,7 +51,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const endTime = performance.now();
     extractedData.extractionTime = Math.round(endTime - startTime);
 
-    console.log(`LLM Visibility Analyzer: Extraction complete in ${extractedData.extractionTime}ms`);
+    console.log(`pdpIQ: Extraction complete in ${extractedData.extractionTime}ms`);
 
     // Send results back
     chrome.runtime.sendMessage({
@@ -723,4 +723,4 @@ function extractSocialProof() {
 }
 
 // Log that content script is loaded
-console.log('LLM Visibility Analyzer: Content script loaded');
+console.log('pdpIQ: Content script loaded');

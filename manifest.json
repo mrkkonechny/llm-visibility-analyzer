@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "LLM Visibility Analyzer",
+  "name": "pdpIQ",
   "version": "1.0.0",
-  "description": "Analyze eCommerce product pages for LLM visibility and get actionable recommendations",
+  "description": "Analyze eCommerce product pages for AI citation readiness and get actionable recommendations",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -17,7 +17,7 @@
     "<all_urls>"
   ],
   "action": {
-    "default_title": "Analyze Page for LLM Visibility"
+    "default_title": "Analyze Page with pdpIQ"
   },
   "side_panel": {
     "default_path": "src/sidepanel/sidepanel.html"

@@ -1,6 +1,6 @@
-# LLM Visibility Analyzer
+# pdpIQ
 
-Chrome extension that analyzes eCommerce Product Detail Pages (PDPs) for their visibility and representation within Large Language Model chat interfaces.
+Chrome extension that analyzes eCommerce Product Detail Pages (PDPs) for AI citation readiness and provides actionable recommendations.
 
 ## Features
 
@@ -32,7 +32,7 @@ Chrome extension that analyzes eCommerce Product Detail Pages (PDPs) for their v
    - Open Chrome and go to `chrome://extensions/`
    - Enable "Developer mode" (toggle in top right)
    - Click "Load unpacked"
-   - Select the `llm-visibility-analyzer` folder
+   - Select the `pdpiq` folder
 
 3. **Test**:
    - Navigate to any eCommerce product page
@@ -72,7 +72,7 @@ Chrome extension that analyzes eCommerce Product Detail Pages (PDPs) for their v
 ## Project Structure
 
 ```
-llm-visibility-analyzer/
+pdpiq/
 ├── manifest.json              # Extension configuration
 ├── icons/                     # Extension icons (add your own)
 ├── src/
