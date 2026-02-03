@@ -116,6 +116,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  * @returns {Promise<Object>} Format verification result
  */
 async function verifyImageFormat(url) {
+  // Validate URL parameter
+  if (!url || typeof url !== 'string') {
+    return {
+      url: url || '',
+      accessible: false,
+      isValid: false,
+      error: 'Invalid or missing URL'
+    };
+  }
+
   try {
     // First try HEAD request for Content-Type
     const response = await fetch(url, {
@@ -304,6 +314,17 @@ async function detectFormatFromMagicBytes(url) {
  * @returns {Promise<Object>} Parsed robots.txt data with AI crawler rules
  */
 async function fetchRobotsTxt(baseUrl) {
+  // Validate URL parameter
+  if (!baseUrl || typeof baseUrl !== 'string') {
+    return {
+      accessible: false,
+      error: 'Invalid or missing baseUrl',
+      crawlerRules: {},
+      blockedCrawlers: [],
+      allowedCrawlers: []
+    };
+  }
+
   try {
     const robotsUrl = new URL('/robots.txt', baseUrl).href;
     const response = await fetch(robotsUrl, {
@@ -427,6 +448,12 @@ async function fetchLlmsTxt(baseUrl) {
     llmsFullTxt: { found: false, url: null, size: null }
   };
 
+  // Validate URL parameter
+  if (!baseUrl || typeof baseUrl !== 'string') {
+    results.error = 'Invalid or missing baseUrl';
+    return results;
+  }
+
   // Check /llms.txt
   try {
     const llmsTxtUrl = new URL('/llms.txt', baseUrl).href;
@@ -482,6 +509,15 @@ async function fetchLlmsTxt(baseUrl) {
  * @returns {Promise<Object>} Last-Modified header info
  */
 async function fetchLastModified(url) {
+  // Validate URL parameter
+  if (!url || typeof url !== 'string') {
+    return {
+      accessible: false,
+      error: 'Invalid or missing URL',
+      lastModified: null
+    };
+  }
+
   try {
     const response = await fetch(url, {
       method: 'HEAD',

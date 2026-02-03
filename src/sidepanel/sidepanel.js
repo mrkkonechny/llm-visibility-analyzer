@@ -13,12 +13,29 @@ import {
   clearHistory
 } from '../storage/storage-manager.js';
 
+/**
+ * Escape HTML to prevent XSS when inserting user-controlled data
+ * @param {string} str - String to escape
+ * @returns {string} Escaped string safe for innerHTML
+ */
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 class SidePanelApp {
   constructor() {
     this.currentData = null;
     this.selectedContext = null;
     this.scoreResult = null;
     this.recommendations = [];
+    this.currentRequestId = null;
+    this.analysisTimeoutId = null;
 
     this.init();
   }
@@ -63,12 +80,47 @@ class SidePanelApp {
         await this.loadHistory();
       }
     });
+
+    // Event delegation for category list (prevents memory leaks from re-rendering)
+    document.getElementById('categoryList').addEventListener('click', (e) => {
+      // Handle category header clicks (expand/collapse)
+      const header = e.target.closest('.category-header');
+      if (header && !e.target.closest('.factor-expand-btn')) {
+        const card = header.closest('.category-card');
+        const isExpanded = header.dataset.expanded === 'true';
+        header.dataset.expanded = !isExpanded;
+        header.querySelector('.expand-icon').textContent = isExpanded ? '+' : '−';
+        card.querySelector('.category-details').classList.toggle('hidden');
+        return;
+      }
+
+      // Handle factor expand button clicks
+      const expandBtn = e.target.closest('.factor-expand-btn');
+      if (expandBtn) {
+        e.stopPropagation();
+        const factor = expandBtn.closest('.factor');
+        const rec = factor.querySelector('.factor-recommendation');
+        const isExpanded = !rec.classList.contains('hidden');
+        rec.classList.toggle('hidden');
+        expandBtn.textContent = isExpanded ? '▶' : '▼';
+      }
+    });
   }
 
   setupMessageListener() {
     chrome.runtime.onMessage.addListener((message) => {
       if (message.type === 'EXTRACTION_COMPLETE') {
+        // Verify this response matches the current request
+        if (message.requestId && message.requestId !== this.currentRequestId) {
+          console.log('Ignoring stale extraction response:', message.requestId);
+          return;
+        }
         console.log('Received extraction data:', message);
+        // Clear the timeout since we received valid data
+        if (this.analysisTimeoutId) {
+          clearTimeout(this.analysisTimeoutId);
+          this.analysisTimeoutId = null;
+        }
         this.currentData = message.data;
         this.processResults();
       }
@@ -91,6 +143,17 @@ class SidePanelApp {
     this.selectedContext = context;
     this.showLoading();
 
+    // Clear any previous timeout and reset state
+    if (this.analysisTimeoutId) {
+      clearTimeout(this.analysisTimeoutId);
+      this.analysisTimeoutId = null;
+    }
+    this.currentData = null;
+
+    // Generate unique request ID to prevent race conditions
+    const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    this.currentRequestId = requestId;
+
     try {
       // Get current tab
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -101,7 +164,7 @@ class SidePanelApp {
       }
 
       // Request data extraction from content script
-      chrome.tabs.sendMessage(tab.id, { type: 'EXTRACT_DATA' }, (response) => {
+      chrome.tabs.sendMessage(tab.id, { type: 'EXTRACT_DATA', requestId }, (response) => {
         if (chrome.runtime.lastError) {
           console.error('Error sending message:', chrome.runtime.lastError);
           // Content script might not be loaded, try injecting
@@ -110,8 +173,9 @@ class SidePanelApp {
       });
 
       // Set a timeout in case we don't get a response
-      setTimeout(() => {
-        if (!this.currentData) {
+      this.analysisTimeoutId = setTimeout(() => {
+        // Only show error if this is still the current request and no data received
+        if (this.currentRequestId === requestId && !this.currentData) {
           this.showError('Analysis timed out. Please try again.');
         }
       }, 10000);
@@ -332,28 +396,8 @@ class SidePanelApp {
         </div>
       `;
 
-      // Toggle expansion
-      const header = card.querySelector('.category-header');
-      header.addEventListener('click', () => {
-        const isExpanded = header.dataset.expanded === 'true';
-        header.dataset.expanded = !isExpanded;
-        header.querySelector('.expand-icon').textContent = isExpanded ? '+' : '−';
-        card.querySelector('.category-details').classList.toggle('hidden');
-      });
-
+      // Event handlers are delegated via categoryList click listener in bindEvents()
       container.appendChild(card);
-
-      // Add click handlers for factor expand buttons
-      card.querySelectorAll('.factor-expand-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const factor = btn.closest('.factor');
-          const rec = factor.querySelector('.factor-recommendation');
-          const isExpanded = !rec.classList.contains('hidden');
-          rec.classList.toggle('hidden');
-          btn.textContent = isExpanded ? '▶' : '▼';
-        });
-      });
     });
   }
 
@@ -443,12 +487,12 @@ class SidePanelApp {
       const timeAgo = this.formatTimeAgo(entry.timestamp);
 
       item.innerHTML = `
-        <div class="history-grade" style="background: ${gradeColor}">${entry.grade}</div>
+        <div class="history-grade" style="background: ${gradeColor}">${escapeHtml(entry.grade)}</div>
         <div class="history-info">
-          <div class="history-title" title="${entry.title}">${entry.title}</div>
-          <div class="history-meta">${entry.domain} · ${timeAgo}</div>
+          <div class="history-title" title="${escapeHtml(entry.title)}">${escapeHtml(entry.title)}</div>
+          <div class="history-meta">${escapeHtml(entry.domain)} · ${escapeHtml(timeAgo)}</div>
         </div>
-        <div class="history-score">${entry.score}</div>
+        <div class="history-score">${escapeHtml(entry.score)}</div>
       `;
 
       container.appendChild(item);

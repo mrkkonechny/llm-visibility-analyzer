@@ -284,3 +284,45 @@ Edit `src/scoring/weights.js`:
 - Markup: `src/sidepanel/sidepanel.html`
 - Styles: `src/sidepanel/sidepanel.css`
 - Logic: `src/sidepanel/sidepanel.js`
+
+## Performance & Security Patterns
+
+### JSON-LD Caching
+The content script uses a caching system to avoid parsing JSON-LD multiple times:
+- `getParsedJsonLd()` - Lazily parses all JSON-LD scripts once and caches the result
+- `iterateSchemaItems(typeFilter)` - Generator that yields schema items from cached data
+- `clearJsonLdCache()` - Called at start/end of `performFullExtraction()` to ensure fresh data
+
+### XSS Prevention
+User-controlled data (page titles, domains from analyzed pages) is escaped before rendering:
+- `escapeHtml()` helper in sidepanel.js for innerHTML contexts
+- Schema descriptions use textarea trick for safe HTML entity decoding (doesn't execute scripts)
+
+### Race Condition Prevention
+The side panel uses request IDs to prevent stale data from being processed:
+- Each analysis gets a unique `requestId`
+- Content script echoes the requestId back in `EXTRACTION_COMPLETE`
+- Side panel ignores responses that don't match `currentRequestId`
+- Timeouts are cleared when valid responses arrive
+
+### Event Delegation
+Category list uses event delegation instead of individual listeners:
+- Single click handler on `#categoryList` container
+- Handles both category header expansion and factor recommendation toggles
+- Prevents memory leaks from re-rendering
+
+### Storage Quota Management
+Storage manager monitors Chrome's 10MB quota:
+- `pruneIfNearQuota()` - Auto-prunes oldest 20% when storage reaches 80% capacity
+- `getStorageStats()` - Returns quota usage percentage
+- History entries store only essential data (scores, not full factor details)
+
+### URL Validation
+Network fetch functions validate inputs before processing:
+- `fetchRobotsTxt()`, `fetchLlmsTxt()`, `fetchLastModified()`, `verifyImageFormat()`
+- Return graceful error objects for invalid/missing URLs instead of throwing
+
+### Date Validation
+Freshness scoring rejects future dates:
+- Dates parsed in `scoreContentFreshness()` are validated against current time
+- Prevents malformed schema dates from giving false freshness scores

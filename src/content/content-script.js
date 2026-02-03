@@ -8,13 +8,85 @@
 
 // For now, we'll define extraction logic inline and structure for modularity
 
+// ==========================================
+// JSON-LD CACHE (performance optimization)
+// Parses JSON-LD scripts once and reuses across all extractors
+// ==========================================
+
+let _jsonLdCache = null;
+
+/**
+ * Get parsed JSON-LD data (cached)
+ * Parses all JSON-LD scripts once and caches the result
+ * @returns {Array} Array of {valid, data, error} objects
+ */
+function getParsedJsonLd() {
+  if (_jsonLdCache !== null) return _jsonLdCache;
+
+  _jsonLdCache = [];
+  document.querySelectorAll('script[type="application/ld+json"]').forEach(script => {
+    try {
+      const data = JSON.parse(script.textContent.trim());
+      _jsonLdCache.push({ valid: true, data });
+    } catch (e) {
+      _jsonLdCache.push({ valid: false, error: e.message });
+    }
+  });
+
+  return _jsonLdCache;
+}
+
+/**
+ * Iterate over all schema items from JSON-LD (generator)
+ * Handles @graph arrays, top-level arrays, and single objects
+ * @param {Array|null} typeFilter - Optional array of types to filter (lowercase)
+ * @yields {{type: string, item: Object}}
+ */
+function* iterateSchemaItems(typeFilter = null) {
+  const jsonLdData = getParsedJsonLd();
+
+  for (const { valid, data } of jsonLdData) {
+    if (!valid) continue;
+
+    // Handle @graph, arrays, and single objects
+    let items;
+    if (data['@graph']) {
+      items = data['@graph'];
+    } else if (Array.isArray(data)) {
+      items = data;
+    } else {
+      items = [data];
+    }
+
+    for (const item of items) {
+      if (!item || !item['@type']) continue;
+
+      const type = (Array.isArray(item['@type']) ? item['@type'][0] : item['@type']).toLowerCase();
+
+      if (!typeFilter || typeFilter.includes(type)) {
+        yield { type, item };
+      }
+    }
+  }
+}
+
+/**
+ * Clear JSON-LD cache (call after extraction completes)
+ */
+function clearJsonLdCache() {
+  _jsonLdCache = null;
+}
+
 /**
  * Main extraction orchestrator
  * @returns {Object} All extracted data
  */
 function performFullExtraction() {
+  // Clear JSON-LD cache for fresh extraction
+  clearJsonLdCache();
+
   try {
-    return {
+    const result = {
       structuredData: extractStructuredData(),
       metaTags: extractMetaTags(),
       contentQuality: extractContentQuality(),
@@ -29,8 +101,13 @@ function performFullExtraction() {
         extractedAt: new Date().toISOString()
       }
     };
+
+    // Clear cache after extraction to free memory
+    clearJsonLdCache();
+    return result;
   } catch (error) {
     console.error('pdpIQ: Extraction error', error);
+    clearJsonLdCache();
     return {
       error: error.message,
       pageInfo: {
@@ -54,12 +131,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     console.log(`pdpIQ: Extraction complete in ${extractedData.extractionTime}ms`);
 
-    // Send results back
+    // Send results back (include requestId to prevent race conditions)
     chrome.runtime.sendMessage({
       type: 'EXTRACTION_COMPLETE',
       data: extractedData,
       url: window.location.href,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      requestId: message.requestId
     });
 
     sendResponse({ success: true });
@@ -91,14 +169,14 @@ function extractStructuredData() {
     }
   };
 
-  // Extract JSON-LD
-  document.querySelectorAll('script[type="application/ld+json"]').forEach(script => {
-    try {
-      const data = JSON.parse(script.textContent.trim());
+  // Extract JSON-LD (uses cached parsing for performance)
+  const parsedJsonLd = getParsedJsonLd();
+  parsedJsonLd.forEach(({ valid, data, error }) => {
+    if (valid) {
       results.jsonLd.push({ valid: true, data });
       categorizeSchemas(data, results.schemas);
-    } catch (e) {
-      results.jsonLd.push({ valid: false, error: e.message });
+    } else {
+      results.jsonLd.push({ valid: false, error });
     }
   });
 
@@ -559,36 +637,22 @@ function analyzeDescription(content) {
 
 /**
  * Extract description from JSON-LD Product schema as fallback
+ * Uses cached JSON-LD data for performance
  * @returns {string|null} Description text or null
  */
 function extractDescriptionFromSchema() {
-  let description = null;
-
-  document.querySelectorAll('script[type="application/ld+json"]').forEach(script => {
-    if (description) return; // Already found
-    try {
-      const data = JSON.parse(script.textContent.trim());
-      const items = data['@graph'] || [data];
-      items.forEach(item => {
-        if (!item || description) return;
-        const type = (Array.isArray(item['@type']) ? item['@type'][0] : item['@type'] || '').toLowerCase();
-        if (type === 'product' && item.description) {
-          // Strip HTML tags if present and decode entities
-          let desc = item.description;
-          if (typeof desc === 'string') {
-            // Create a temporary element to decode HTML entities and strip tags
-            const temp = document.createElement('div');
-            temp.innerHTML = desc;
-            description = temp.textContent || temp.innerText || desc;
-          }
-        }
-      });
-    } catch (e) {
-      // Invalid JSON, skip
+  for (const { item } of iterateSchemaItems(['product'])) {
+    if (item.description && typeof item.description === 'string') {
+      // Use textarea for safe HTML entity decoding (doesn't execute scripts)
+      const textarea = document.createElement('textarea');
+      textarea.innerHTML = item.description;
+      // Get decoded text, then strip any remaining HTML tags
+      const decoded = textarea.value;
+      return decoded.replace(/<[^>]*>/g, '').trim();
     }
-  });
+  }
 
-  return description;
+  return null;
 }
 
 function extractSpecifications() {
@@ -1333,12 +1397,12 @@ function extractReviewSignals() {
   let mostRecentDate = null;
   let reviewLengths = [];
 
-  // From structured data
-  document.querySelectorAll('script[type="application/ld+json"]').forEach(script => {
-    try {
-      const data = JSON.parse(script.textContent);
-      const items = data['@graph'] || [data];
-      items.forEach(item => {
+  // From structured data (uses cached JSON-LD for performance)
+  const parsedJsonLd = getParsedJsonLd();
+  parsedJsonLd.forEach(({ valid, data }) => {
+    if (!valid) return;
+    const items = data['@graph'] || (Array.isArray(data) ? data : [data]);
+    items.forEach(item => {
         if (item.aggregateRating) {
           rating = parseFloat(item.aggregateRating.ratingValue);
           count = parseInt(item.aggregateRating.reviewCount, 10) || parseInt(item.aggregateRating.ratingCount, 10);
@@ -1378,7 +1442,6 @@ function extractReviewSignals() {
           }
         }
       });
-    } catch (e) {}
   });
 
   // Fallback to DOM for rating

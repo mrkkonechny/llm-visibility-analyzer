@@ -950,11 +950,13 @@ export class ScoringEngine {
       { date: lastModified?.lastModified, source: 'Last-Modified header' }
     ];
 
+    const now = new Date();
     for (const { date, source } of dateSources) {
       if (date) {
         try {
           const parsed = new Date(date);
-          if (!isNaN(parsed.getTime())) {
+          // Skip invalid dates and future dates (could indicate data errors)
+          if (!isNaN(parsed.getTime()) && parsed <= now) {
             if (!mostRecentDate || parsed > mostRecentDate.date) {
               mostRecentDate = { date: parsed, source };
             }
@@ -966,7 +968,6 @@ export class ScoringEngine {
     }
 
     if (mostRecentDate) {
-      const now = new Date();
       const ageInDays = Math.floor((now - mostRecentDate.date) / (1000 * 60 * 60 * 24));
 
       let freshnessPercent;
