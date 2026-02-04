@@ -263,13 +263,24 @@ function categorizeSchemaItem(item, schemas) {
   const type = Array.isArray(item['@type']) ? item['@type'][0] : item['@type'];
   const typeLower = type.toLowerCase();
 
-  // Product
-  if (typeLower === 'product') {
-    schemas.product = extractProductSchema(item);
+  // Product or ProductGroup
+  if (typeLower === 'product' || typeLower === 'productgroup') {
+    schemas.product = extractProductSchema(item, typeLower === 'productgroup');
 
-    // Extract nested schemas from Product
-    if (item.offers) {
-      const offers = Array.isArray(item.offers) ? item.offers : [item.offers];
+    // Extract nested schemas from Product/ProductGroup
+    // Check direct offers first, then hasVariant for ProductGroup
+    let offersSource = item.offers;
+    if (!offersSource && item.hasVariant) {
+      const variants = Array.isArray(item.hasVariant) ? item.hasVariant : [item.hasVariant];
+      for (const variant of variants) {
+        if (variant && variant.offers) {
+          offersSource = variant.offers;
+          break;
+        }
+      }
+    }
+    if (offersSource) {
+      const offers = Array.isArray(offersSource) ? offersSource : [offersSource];
       schemas.offer = offers.map(extractOfferSchema);
     }
     if (item.aggregateRating) {
@@ -331,13 +342,15 @@ function categorizeSchemaItem(item, schemas) {
 
 /**
  * Extract Product schema properties
+ * @param {Object} item - Schema item
+ * @param {boolean} isProductGroup - Whether this is a ProductGroup type
  */
-function extractProductSchema(item) {
+function extractProductSchema(item, isProductGroup = false) {
   return {
     name: item.name || null,
     description: item.description || null,
     image: extractImageValue(item.image),
-    sku: item.sku || null,
+    sku: item.sku || item.productGroupID || null,
     gtin: item.gtin || item.gtin13 || item.gtin14 || item.gtin8 || item.gtin12 || null,
     mpn: item.mpn || null,
     brand: item.brand?.name || (typeof item.brand === 'string' ? item.brand : null),
@@ -348,9 +361,10 @@ function extractProductSchema(item) {
     width: item.width || null,
     height: item.height || null,
     depth: item.depth || null,
-    hasOffer: !!item.offers,
+    hasOffer: !!item.offers || !!(item.hasVariant && item.hasVariant.length > 0),
     hasRating: !!item.aggregateRating,
     hasReviews: !!(item.review && (Array.isArray(item.review) ? item.review.length : true)),
+    isProductGroup,
     raw: item
   };
 }
@@ -525,13 +539,15 @@ function categorizeMicrodataSchemas(microdataItems, schemas) {
     // Normalize type (remove schema.org prefix)
     const type = item.type.replace(/^https?:\/\/schema\.org\//, '').toLowerCase();
 
-    if (type === 'product' && !schemas.product) {
+    if ((type === 'product' || type === 'productgroup') && !schemas.product) {
       schemas.product = {
         name: item.properties.name || null,
         description: item.properties.description || null,
         image: item.properties.image || null,
-        sku: item.properties.sku || null,
+        sku: item.properties.sku || item.properties.productGroupID || null,
         brand: item.properties.brand || null,
+        hasOffer: !!item.properties.offers || !!item.properties.hasVariant,
+        isProductGroup: type === 'productgroup',
         source: 'microdata',
         raw: item
       };

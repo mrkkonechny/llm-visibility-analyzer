@@ -91,7 +91,8 @@ function getStructuredRating() {
       items.forEach(item => {
         // Look for AggregateRating
         const rating = item.aggregateRating || item;
-        if (rating['@type'] === 'AggregateRating' || item['@type'] === 'Product') {
+        const itemType = (item['@type'] || '').toLowerCase();
+        if (rating['@type'] === 'AggregateRating' || itemType === 'product' || itemType === 'productgroup') {
           const r = item.aggregateRating || rating;
           if (r.ratingValue) {
             result.ratingValue = parseFloat(r.ratingValue);
@@ -369,7 +370,8 @@ function extractBrandSignals() {
       const items = data['@graph'] || [data];
 
       items.forEach(item => {
-        if (item['@type'] === 'Product' && item.brand) {
+        const itemType = (item['@type'] || '').toLowerCase();
+        if ((itemType === 'product' || itemType === 'productgroup') && item.brand) {
           brandName = typeof item.brand === 'string' ? item.brand : item.brand.name;
         }
         if (item['@type'] === 'Organization' || item['@type'] === 'Brand') {

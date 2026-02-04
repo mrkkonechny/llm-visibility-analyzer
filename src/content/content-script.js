@@ -224,21 +224,34 @@ function categorizeSchemas(data, schemas) {
     if (!item || !item['@type']) return;
     const type = (Array.isArray(item['@type']) ? item['@type'][0] : item['@type']).toLowerCase();
 
-    if (type === 'product') {
+    if (type === 'product' || type === 'productgroup') {
       const brandName = extractBrandName(item.brand) || extractBrandName(item.manufacturer);
       schemas.product = {
         name: item.name,
         description: item.description,
         image: extractImageUrl(item.image),
-        sku: item.sku,
+        sku: item.sku || item.productGroupID,
         gtin: item.gtin || item.gtin13 || item.gtin14 || item.gtin12 || item.gtin8,
         mpn: item.mpn,
         brand: brandName,
-        hasOffer: !!item.offers,
-        hasRating: !!item.aggregateRating
+        hasOffer: !!item.offers || !!(item.hasVariant && item.hasVariant.length > 0),
+        hasRating: !!item.aggregateRating,
+        isProductGroup: type === 'productgroup'
       };
-      if (item.offers) {
-        const offers = Array.isArray(item.offers) ? item.offers : [item.offers];
+      // Extract offers - check direct offers first, then hasVariant for ProductGroup
+      let offersSource = item.offers;
+      if (!offersSource && item.hasVariant) {
+        // ProductGroup: extract offers from first variant that has them
+        const variants = Array.isArray(item.hasVariant) ? item.hasVariant : [item.hasVariant];
+        for (const variant of variants) {
+          if (variant && variant.offers) {
+            offersSource = variant.offers;
+            break;
+          }
+        }
+      }
+      if (offersSource) {
+        const offers = Array.isArray(offersSource) ? offersSource : [offersSource];
         schemas.offer = offers.map(o => ({
           price: o.price || o.lowPrice,
           priceCurrency: o.priceCurrency,
@@ -329,15 +342,16 @@ function categorizeMicrodataSchemas(microdataItems, schemas) {
     if (!item.type) return;
     const type = item.type.replace(/^https?:\/\/schema\.org\//, '').toLowerCase();
 
-    if (type === 'product' && !schemas.product) {
+    if ((type === 'product' || type === 'productgroup') && !schemas.product) {
       schemas.product = {
         name: item.properties.name || null,
         description: item.properties.description || null,
         image: item.properties.image || null,
-        sku: item.properties.sku || null,
+        sku: item.properties.sku || item.properties.productGroupID || null,
         brand: extractBrandName(item.properties.brand?.properties?.name || item.properties.brand) || extractBrandName(item.properties.manufacturer),
-        hasOffer: !!item.properties.offers,
+        hasOffer: !!item.properties.offers || !!item.properties.hasVariant,
         hasRating: !!item.properties.aggregateRating,
+        isProductGroup: type === 'productgroup',
         source: 'microdata'
       };
       // Extract nested offers from Product
@@ -800,7 +814,7 @@ function extractSpecsFromSchema(specs) {
       items.forEach(item => {
         if (!item) return;
         const type = (Array.isArray(item['@type']) ? item['@type'][0] : item['@type'] || '').toLowerCase();
-        if (type === 'product') {
+        if (type === 'product' || type === 'productgroup') {
           // Extract from additionalProperty
           if (item.additionalProperty && Array.isArray(item.additionalProperty)) {
             item.additionalProperty.forEach(prop => {
@@ -1146,7 +1160,7 @@ function extractProductDetailsFromSchema(details) {
       items.forEach(item => {
         if (!item) return;
         const type = (Array.isArray(item['@type']) ? item['@type'][0] : item['@type'] || '').toLowerCase();
-        if (type === 'product') {
+        if (type === 'product' || type === 'productgroup') {
           // Check direct properties
           if (!details.hasDimensions) {
             const dims = [];
@@ -1407,12 +1421,9 @@ function extractReviewSignals() {
           rating = parseFloat(item.aggregateRating.ratingValue);
           count = parseInt(item.aggregateRating.reviewCount, 10) || parseInt(item.aggregateRating.ratingCount, 10);
         }
-        if (item['@type'] === 'Product' && item.aggregateRating) {
-          rating = parseFloat(item.aggregateRating.ratingValue);
-          count = parseInt(item.aggregateRating.reviewCount, 10);
-        }
         // Extract individual reviews for depth/recency analysis
-        if (item['@type'] === 'Product' && item.review) {
+        const itemType = (Array.isArray(item['@type']) ? item['@type'][0] : item['@type'] || '').toLowerCase();
+        if ((itemType === 'product' || itemType === 'productgroup') && item.review) {
           const reviewList = Array.isArray(item.review) ? item.review : [item.review];
           reviewList.forEach(r => {
             if (r.datePublished) {
@@ -1736,7 +1747,7 @@ function extractCertificationsFromSchema() {
         if (!item) return;
         const type = (Array.isArray(item['@type']) ? item['@type'][0] : item['@type'] || '').toLowerCase();
 
-        if (type === 'product') {
+        if (type === 'product' || type === 'productgroup') {
           // Check certification field (schema.org spec)
           if (item.certification) {
             const certifications = Array.isArray(item.certification) ? item.certification : [item.certification];
@@ -1846,7 +1857,7 @@ function extractAwardsFromSchema() {
         if (!item) return;
         const type = (Array.isArray(item['@type']) ? item['@type'][0] : item['@type'] || '').toLowerCase();
 
-        if (type === 'product') {
+        if (type === 'product' || type === 'productgroup') {
           // Check award field (schema.org spec)
           if (item.award) {
             const awardList = Array.isArray(item.award) ? item.award : [item.award];
