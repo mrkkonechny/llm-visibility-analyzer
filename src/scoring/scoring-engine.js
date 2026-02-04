@@ -841,29 +841,16 @@ export class ScoringEngine {
     const weights = FACTOR_WEIGHTS.aiDiscoverability;
     const robots = networkData?.robots || {};
     const llms = networkData?.llms || {};
-    const lastModified = networkData?.lastModified || {};
-    const schemaDate = pageData?.schemaDate || {};
-    const visibleDate = pageData?.visibleDate || {};
 
-    // AI Crawler Access (35 points)
+    // AI Crawler Access (65 points)
     const crawlerResult = this.scoreAICrawlerAccess(robots, weights.aiCrawlerAccess);
     factors.push(crawlerResult.factor);
     rawScore += crawlerResult.score;
 
-    // Content Freshness (30 points)
-    const freshnessResult = this.scoreContentFreshness(schemaDate, lastModified, weights.contentFreshness);
-    factors.push(freshnessResult.factor);
-    rawScore += freshnessResult.score;
-
-    // llms.txt Presence (20 points)
+    // llms.txt Presence (35 points)
     const llmsResult = this.scoreLlmsTxt(llms, weights.llmsTxtPresence);
     factors.push(llmsResult.factor);
     rawScore += llmsResult.score;
-
-    // Date Signals Present (15 points)
-    const dateResult = this.scoreDateSignals(schemaDate, visibleDate, weights.dateSignalsPresent);
-    factors.push(dateResult.factor);
-    rawScore += dateResult.score;
 
     return {
       score: Math.min(100, rawScore),
@@ -928,91 +915,6 @@ export class ScoringEngine {
   }
 
   /**
-   * Score content freshness based on date signals
-   * Freshness thresholds:
-   * - ≤7 days: 100%
-   * - 8-30 days: 83%
-   * - 31-90 days: 67%
-   * - 91-180 days: 33%
-   * - 181-365 days: 17%
-   * - >365 days: 0%
-   */
-  scoreContentFreshness(schemaDate, lastModified, maxPoints) {
-    let score = 0;
-    let status = 'unknown';
-    let details = 'No freshness signals found';
-    let mostRecentDate = null;
-
-    // Find the most recent date from available sources
-    const dateSources = [
-      { date: schemaDate.dateModified, source: 'schema dateModified' },
-      { date: schemaDate.datePublished, source: 'schema datePublished' },
-      { date: lastModified?.lastModified, source: 'Last-Modified header' }
-    ];
-
-    const now = new Date();
-    for (const { date, source } of dateSources) {
-      if (date) {
-        try {
-          const parsed = new Date(date);
-          // Skip invalid dates and future dates (could indicate data errors)
-          if (!isNaN(parsed.getTime()) && parsed <= now) {
-            if (!mostRecentDate || parsed > mostRecentDate.date) {
-              mostRecentDate = { date: parsed, source };
-            }
-          }
-        } catch (e) {
-          // Skip invalid dates
-        }
-      }
-    }
-
-    if (mostRecentDate) {
-      const ageInDays = Math.floor((now - mostRecentDate.date) / (1000 * 60 * 60 * 24));
-
-      let freshnessPercent;
-      if (ageInDays <= 7) {
-        freshnessPercent = 100;
-      } else if (ageInDays <= 30) {
-        freshnessPercent = 83;
-      } else if (ageInDays <= 90) {
-        freshnessPercent = 67;
-      } else if (ageInDays <= 180) {
-        freshnessPercent = 33;
-      } else if (ageInDays <= 365) {
-        freshnessPercent = 17;
-      } else {
-        freshnessPercent = 0;
-      }
-
-      score = Math.round((freshnessPercent / 100) * maxPoints);
-      status = freshnessPercent >= 67 ? 'pass' : freshnessPercent >= 33 ? 'warning' : 'fail';
-
-      const ageText = ageInDays === 0 ? 'today' :
-                      ageInDays === 1 ? '1 day ago' :
-                      ageInDays < 30 ? `${ageInDays} days ago` :
-                      ageInDays < 365 ? `${Math.floor(ageInDays / 30)} months ago` :
-                      `${Math.floor(ageInDays / 365)}+ years ago`;
-
-      details = `Last updated ${ageText} (${mostRecentDate.source})`;
-    } else {
-      status = 'fail';
-      score = 0;
-    }
-
-    return {
-      score,
-      factor: {
-        name: 'Content Freshness',
-        status,
-        points: score,
-        maxPoints,
-        details
-      }
-    };
-  }
-
-  /**
    * Score llms.txt presence
    * @param {Object} llmsData - llms.txt fetch results
    * @param {number} maxPoints - Maximum points for this factor
@@ -1042,54 +944,6 @@ export class ScoringEngine {
       score,
       factor: {
         name: 'llms.txt Presence',
-        status,
-        points: score,
-        maxPoints,
-        details
-      }
-    };
-  }
-
-  /**
-   * Score date signals presence (schema + visible)
-   * @param {Object} schemaDate - Schema date signals
-   * @param {Object} visibleDate - Visible date signals
-   * @param {number} maxPoints - Maximum points for this factor
-   */
-  scoreDateSignals(schemaDate, visibleDate, maxPoints) {
-    let score = 0;
-    let status = 'fail';
-    let details = 'No date signals detected';
-    const signals = [];
-
-    // Check schema dates
-    if (schemaDate.dateModified) {
-      signals.push('dateModified');
-      score += maxPoints * 0.5;
-    }
-    if (schemaDate.datePublished) {
-      signals.push('datePublished');
-      score += maxPoints * 0.25;
-    }
-
-    // Check visible dates
-    if (visibleDate.found) {
-      signals.push(`visible (${visibleDate.dateType || 'date'})`);
-      score += maxPoints * 0.25;
-    }
-
-    // Cap at max points
-    score = Math.min(maxPoints, score);
-
-    if (signals.length > 0) {
-      status = signals.includes('dateModified') ? 'pass' : 'warning';
-      details = `Found: ${signals.join(', ')}`;
-    }
-
-    return {
-      score,
-      factor: {
-        name: 'Date Signals',
         status,
         points: score,
         maxPoints,

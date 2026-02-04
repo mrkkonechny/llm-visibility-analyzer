@@ -12,7 +12,7 @@ export const CATEGORY_DESCRIPTIONS = {
   contentQuality: 'Product descriptions, specifications, features, and FAQ content',
   contentStructure: 'Semantic HTML, headings, accessibility, and image alt text',
   authorityTrust: 'Reviews, ratings, brand clarity, and trust signals',
-  aiDiscoverability: 'AI crawler access, content freshness, and llms.txt presence for AI system discovery'
+  aiDiscoverability: 'AI crawler access and llms.txt presence for AI system discovery'
 };
 
 /**
@@ -150,10 +150,8 @@ export const FACTOR_WEIGHTS = {
 
   // AI Discoverability (10% of total)
   aiDiscoverability: {
-    aiCrawlerAccess: 35,     // robots.txt rules for major AI bots
-    contentFreshness: 30,    // Date signals and age scoring
-    llmsTxtPresence: 20,     // /llms.txt and /llms-full.txt presence
-    dateSignalsPresent: 15   // Schema dates + visible date patterns
+    aiCrawlerAccess: 65,     // robots.txt rules for major AI bots
+    llmsTxtPresence: 35      // /llms.txt and /llms-full.txt presence
   }
 };
 
@@ -247,7 +245,5 @@ export const FACTOR_RECOMMENDATIONS = {
 
   // AI Discoverability
   'AI Crawler Access': 'ai-crawler-blocked',
-  'Content Freshness': 'content-outdated',
-  'llms.txt Presence': 'llms-txt-missing',
-  'Date Signals': 'date-signals-missing'
+  'llms.txt Presence': 'llms-txt-missing'
 };

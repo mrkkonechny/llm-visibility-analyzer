@@ -300,15 +300,6 @@ export const RECOMMENDATION_TEMPLATES = {
     implementation: 'Update your robots.txt to allow AI crawlers. Remove or modify Disallow rules for User-agent: GPTBot, ChatGPT-User, ClaudeBot, Claude-Web, Anthropic-AI, PerplexityBot, Google-Extended. Consider allowing at least read-only access for product pages.'
   },
 
-  'content-outdated': {
-    title: 'Update content freshness signals',
-    description: 'Content appears stale based on date signals. AI systems prioritize fresh, recently updated content when making recommendations.',
-    impact: 'medium',
-    effort: 'medium',
-    category: 'aiDiscoverability',
-    implementation: 'Add or update dateModified in your Product schema. Include visible "Last updated" or "Updated on" text on the page. Ensure the Last-Modified HTTP header is set correctly by your server.'
-  },
-
   'llms-txt-missing': {
     title: 'Add llms.txt file',
     description: 'No llms.txt file found. This emerging standard helps AI systems understand how to interact with your site and what content is available.',
@@ -316,15 +307,6 @@ export const RECOMMENDATION_TEMPLATES = {
     effort: 'low',
     category: 'aiDiscoverability',
     implementation: 'Create /llms.txt at your domain root with site description, key content areas, and AI-friendly guidelines. Optionally create /llms-full.txt with more detailed instructions. See llmstxt.org for the specification.'
-  },
-
-  'date-signals-missing': {
-    title: 'Add date signals to content',
-    description: 'No date signals detected on the page. AI systems use dates to assess content freshness and relevance.',
-    impact: 'low',
-    effort: 'low',
-    category: 'aiDiscoverability',
-    implementation: 'Add datePublished and dateModified to your Product schema. Include a visible date on the page (e.g., "Last updated: January 2024"). Use standard date formats that AI systems can parse.'
   }
 };
 
