@@ -650,12 +650,12 @@ function analyzeDescription(content) {
 }
 
 /**
- * Extract description from JSON-LD Product schema as fallback
+ * Extract description from JSON-LD Product/ProductGroup schema as fallback
  * Uses cached JSON-LD data for performance
  * @returns {string|null} Description text or null
  */
 function extractDescriptionFromSchema() {
-  for (const { item } of iterateSchemaItems(['product'])) {
+  for (const { item } of iterateSchemaItems(['product', 'productgroup'])) {
     if (item.description && typeof item.description === 'string') {
       // Use textarea for safe HTML entity decoding (doesn't execute scripts)
       const textarea = document.createElement('textarea');
