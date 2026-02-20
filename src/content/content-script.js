@@ -220,19 +220,36 @@ function categorizeSchemas(data, schemas) {
     items = [data];
   }
 
+  // Build @id index for resolving references within this JSON-LD block
+  const idIndex = {};
+  items.forEach(item => { if (item && item['@id']) idIndex[item['@id']] = item; });
+
   items.forEach(item => {
     if (!item || !item['@type']) return;
     const type = (Array.isArray(item['@type']) ? item['@type'][0] : item['@type']).toLowerCase();
 
     if (type === 'product' || type === 'productgroup') {
       const brandName = extractBrandName(item.brand) || extractBrandName(item.manufacturer);
+      // For ProductGroup, GTIN/MPN may live on variants rather than the group itself
+      let gtin = item.gtin || item.gtin13 || item.gtin14 || item.gtin12 || item.gtin8;
+      let mpn = item.mpn;
+      if ((!gtin || !mpn) && item.hasVariant) {
+        const variants = Array.isArray(item.hasVariant) ? item.hasVariant : [item.hasVariant];
+        for (const variant of variants) {
+          if (variant) {
+            if (!gtin) gtin = variant.gtin || variant.gtin13 || variant.gtin14 || variant.gtin12 || variant.gtin8;
+            if (!mpn) mpn = variant.mpn;
+            if (gtin && mpn) break;
+          }
+        }
+      }
       schemas.product = {
         name: item.name,
         description: item.description,
         image: extractImageUrl(item.image),
         sku: item.sku || item.productGroupID,
-        gtin: item.gtin || item.gtin13 || item.gtin14 || item.gtin12 || item.gtin8,
-        mpn: item.mpn,
+        gtin,
+        mpn,
         brand: brandName,
         hasOffer: !!item.offers || !!(item.hasVariant && item.hasVariant.length > 0),
         hasRating: !!item.aggregateRating,
@@ -259,11 +276,18 @@ function categorizeSchemas(data, schemas) {
         }));
       }
       if (item.aggregateRating) {
-        schemas.aggregateRating = {
-          ratingValue: parseFloat(item.aggregateRating.ratingValue),
-          reviewCount: parseInt(item.aggregateRating.reviewCount, 10) || null,
-          bestRating: parseFloat(item.aggregateRating.bestRating) || 5
-        };
+        // Resolve @id reference (Shopify ProductGroup pattern: "aggregateRating": {"@id": "#reviews"})
+        const ratingData = item.aggregateRating['@id']
+          ? (idIndex[item.aggregateRating['@id']] || item.aggregateRating)
+          : item.aggregateRating;
+        const rv = parseFloat(ratingData.ratingValue);
+        if (!isNaN(rv)) {
+          schemas.aggregateRating = {
+            ratingValue: rv,
+            reviewCount: parseInt(ratingData.reviewCount, 10) || parseInt(ratingData.ratingCount, 10) || null,
+            bestRating: parseFloat(ratingData.bestRating) || 5
+          };
+        }
       }
       // Extract nested brand/organization schemas
       if (!schemas.brand && item.brand) {
@@ -1430,13 +1454,31 @@ function extractReviewSignals() {
   parsedJsonLd.forEach(({ valid, data }) => {
     if (!valid) return;
     const items = data['@graph'] || (Array.isArray(data) ? data : [data]);
+    // Build @id index for resolving aggregateRating references within this block
+    const idIndex = {};
+    items.forEach(item => { if (item && item['@id']) idIndex[item['@id']] = item; });
     items.forEach(item => {
         if (item.aggregateRating) {
-          rating = parseFloat(item.aggregateRating.ratingValue);
-          count = parseInt(item.aggregateRating.reviewCount, 10) || parseInt(item.aggregateRating.ratingCount, 10);
+          // Resolve @id reference (Shopify ProductGroup pattern: "aggregateRating": {"@id": "#reviews"})
+          const ratingData = item.aggregateRating['@id']
+            ? (idIndex[item.aggregateRating['@id']] || item.aggregateRating)
+            : item.aggregateRating;
+          const rv = parseFloat(ratingData.ratingValue);
+          if (!isNaN(rv) && rating === null) {
+            rating = rv;
+            count = parseInt(ratingData.reviewCount, 10) || parseInt(ratingData.ratingCount, 10) || null;
+          }
         }
         // Extract individual reviews for depth/recency analysis
         const itemType = (Array.isArray(item['@type']) ? item['@type'][0] : item['@type'] || '').toLowerCase();
+        // Handle standalone AggregateRating items (not nested via @id reference)
+        if (itemType === 'aggregaterating' && rating === null) {
+          const rv = parseFloat(item.ratingValue);
+          if (!isNaN(rv)) {
+            rating = rv;
+            count = parseInt(item.reviewCount, 10) || parseInt(item.ratingCount, 10) || null;
+          }
+        }
         if ((itemType === 'product' || itemType === 'productgroup') && item.review) {
           const reviewList = Array.isArray(item.review) ? item.review : [item.review];
           reviewList.forEach(r => {
@@ -1571,10 +1613,12 @@ function extractBrandSignals() {
   document.querySelectorAll('script[type="application/ld+json"]').forEach(script => {
     try {
       const data = JSON.parse(script.textContent);
-      const items = data['@graph'] || [data];
+      // Handle top-level array, @graph, and single-object formats
+      const items = Array.isArray(data) ? data : data['@graph'] ? data['@graph'] : [data];
       items.forEach(item => {
-        if (item['@type'] === 'Product' && item.brand) {
-          brandName = typeof item.brand === 'string' ? item.brand : item.brand.name;
+        if (!brandName && (item['@type'] === 'Product' || item['@type'] === 'ProductGroup')) {
+          if (item.brand) brandName = extractBrandName(item.brand);
+          if (!brandName && item.manufacturer) brandName = extractBrandName(item.manufacturer);
         }
       });
     } catch (e) {}
@@ -1938,11 +1982,43 @@ function extractSocialProof() {
 function extractAIDiscoverabilitySignals() {
   const schemaDate = extractSchemaDateSignals();
   const visibleDate = extractVisibleDateSignals();
+  const answerFormat = extractAnswerFormatContent();
 
   return {
     schemaDate,
     visibleDate,
-    hasAnyDateSignal: !!(schemaDate.dateModified || schemaDate.datePublished || visibleDate.found)
+    hasAnyDateSignal: !!(schemaDate.dateModified || schemaDate.datePublished || visibleDate.found),
+    answerFormat
+  };
+}
+
+/**
+ * Extract answer-format content signals for AI discoverability
+ * Detects "best for" statements, comparison content, how-to content, and use case descriptions
+ * @returns {Object} Answer format content signals
+ */
+function extractAnswerFormatContent() {
+  const bodyText = document.body.innerText;
+
+  // Count "best for" / "ideal for" / "perfect for" / "great for" / "designed for" statements
+  const bestForMatches = bodyText.match(/\b(?:best|ideal|perfect|great|designed)\s+for\b/gi) || [];
+  const bestForCount = bestForMatches.length;
+
+  // Check for comparison content: "vs." or "versus" or "compared to"
+  const hasComparison = /\b(?:vs\.?|versus|compared\s+to)\b/i.test(bodyText);
+
+  // Check for "how to" patterns near product context
+  const hasHowTo = /\bhow\s+to\b/i.test(bodyText);
+
+  // Count use case descriptions ("great for outdoor", "perfect for small spaces", etc.)
+  const useCaseMatches = bodyText.match(/\b(?:best|ideal|perfect|great|designed|suitable|recommended)\s+for\s+[a-z][a-z\s]{3,30}/gi) || [];
+  const useCaseCount = useCaseMatches.length;
+
+  return {
+    bestForCount,
+    hasComparison,
+    hasHowTo,
+    useCaseCount
   };
 }
 
